@@ -51,6 +51,14 @@ if "conn" in st.session_state:
     else:
         selected_dbs = []
 
+    def escape_identifier(name):
+        # double-quote and escape internal quotes
+        return f'"{name.replace("\"", "\"\"")}"'
+    
+    def run_show_and_fetch(sql):
+        cursor.execute(sql)
+        return cursor.fetchall()
+    
     if "WAREHOUSE" in levels:
         cursor.execute("SHOW WAREHOUSES")
         raw_warehouses = cursor.fetchall()
@@ -109,15 +117,19 @@ if "conn" in st.session_state:
             failed_whs = []
             for wh in targets:
                 try:
+                    safe_wh = escape_identifier(wh)
                     try:
-                        cursor.execute(f'ALTER WAREHOUSE "{wh}" RESUME')
+                        cursor.execute(f'ALTER WAREHOUSE {safe_wh} RESUME')
                     except:
                         pass
         
-                    cursor.execute(f'USE WAREHOUSE "{wh}"')
-                    # 修正：SHOW PARAMETERS 不能带 USE 的 context，需加引号避免解析错误
-                    df = run_show_and_fetch(f'SHOW PARAMETERS IN WAREHOUSE "{wh}"')
-                    df = pd.DataFrame(df, columns=[
+                    # SHOW PARAMETERS に USE は不要
+                    df_raw = run_show_and_fetch(f'SHOW PARAMETERS IN WAREHOUSE {safe_wh}')
+        
+                    if not df_raw or all(all(cell is None for cell in row) for row in df_raw):
+                        raise ValueError("No parameters returned")
+        
+                    df = pd.DataFrame(df_raw, columns=[
                         "key", "value", "default", "level", "description", "type"
                     ])
         
