@@ -5,33 +5,32 @@ from io import BytesIO
 
 # --- Sidebar: Snowflake credentials ---
 st.sidebar.header("Snowflake 接続情報")
-st.sidebar.markdown("※ 個人アカウントをご利用の場合、Duo認証による承認が必要です。ご確認ください。")
-st.sidebar.markdown("※ Account は Snowflake の **Account Identifier（例：abc-xy12345）** を入力してください。")
-
-account = st.sidebar.text_input("Account Identifier", value="")
+account = st.sidebar.text_input("Account Identifier", value="", placeholder="例：abc-xy12345")
 user = st.sidebar.text_input("User Name", value="")
 password = st.sidebar.text_input("Password", type="password")
+st.sidebar.markdown("※ 個人アカウントをご利用の場合、Duo認証による承認が必要です。ご確認ください。")
 
 if st.sidebar.button("接続"):
     try:
         conn = snowflake.connector.connect(user=user, password=password, account=account)
         st.session_state["conn"] = conn
-        st.sidebar.success("✅ 接続成功！")
+        st.sidebar.success("接続成功！")
     except Exception as e:
         st.sidebar.error(f"接続失敗: {e}")
 
 # --- Title & Introduction ---
 st.title("Snowflake パラメータ確認ツール")
 
-with st.expander("🔍 ツールの目的と概要", expanded=True):
+with st.expander("ツールの目的と概要", expanded=True):
     st.markdown("""
-    本ツールは、**Snowflake環境における各種設定パラメータ**を手軽に一括確認するためのアプリです。  
-    通常は `SHOW PARAMETERS` コマンドを手動実行する必要がありますが、対象を選んで一括取得・出力できます。
+    本ツールは、**Snowflake環境における各種設定パラメータ**を手軽に一括確認・出力するためのアプリです。
 
-    **用途例：**
-    - 管理者や開発者による現在の環境設定の確認
-    - クライアント説明資料としての活用
-    - トラブルシューティングや監査時の設定確認
+    通常 `SHOW PARAMETERS` コマンドを手動で実行する必要がありますが、本ツールでは対象を選択し、まとめて取得・確認・Excel出力が可能です。
+
+    **活用例：**
+    - 開発者・管理者による設定確認
+    - クライアント説明用の資料作成
+    - トラブル対応時の環境設定把握
     """)
 
 # --- Parameter Retrieval ---
@@ -60,7 +59,17 @@ if "conn" in st.session_state:
 
     def run_show_and_fetch(sql):
         cursor.execute(sql)
-        return pd.DataFrame(cursor.fetchall(), columns=[col[0] for col in cursor.description])
+        df = pd.DataFrame(cursor.fetchall(), columns=[col[0] for col in cursor.description])
+        col_rename = {
+            "key": "key / キー",
+            "value": "value / 値",
+            "default": "default / デフォルト",
+            "level": "level / レベル",
+            "description": "description / 説明",
+            "type": "type / タイプ"
+        }
+        df.columns = [col_rename.get(c.lower(), c) for c in df.columns]
+        return df
 
     def to_excel_multi_sheet(df_dict):
         output = BytesIO()
@@ -97,12 +106,12 @@ if "conn" in st.session_state:
                 result_dict[f"WAREHOUSE_{wh}"] = df
 
         if result_dict:
-            st.success("✅ パラメータ取得完了")
+            excel_file = to_excel_multi_sheet(result_dict)
+            st.download_button("Excelとしてダウンロード", data=excel_file, file_name="snowflake_parameters.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+            st.success("パラメータ取得完了")
             for name, df in result_dict.items():
                 st.subheader(f"{name}")
                 st.dataframe(df, use_container_width=True, height=400)
-
-            excel_file = to_excel_multi_sheet(result_dict)
-            st.download_button("Excelとしてダウンロード", data=excel_file, file_name="snowflake_parameters.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
         else:
-            st.warning("⚠️ 選択された対象のパラメータを取得できませんでした。")
+            st.warning("選択された対象のパラメータを取得できませんでした。")
