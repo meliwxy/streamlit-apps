@@ -151,6 +151,5 @@ if "conn" in st.session_state:
             for name, df in result_dict.items():
                 st.subheader(name)
                 st.dataframe(df, use_container_width=True)
-            st.info("ダウンロードが完了しました")
         else:
             st.warning("選択された対象のパラメータを取得できませんでした")
