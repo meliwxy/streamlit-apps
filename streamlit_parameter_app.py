@@ -3,7 +3,7 @@ import pandas as pd
 import snowflake.connector
 from io import BytesIO
 
-st.set_page_config(page_title="Snowflake パラメータ確認ツール", layout="wide", initial_sidebar_state="expanded")
+st.set_page_config(page_title="Snowflake Parameter Tool", layout="wide", initial_sidebar_state="expanded")
 
 # --- Sidebar: Snowflake credentials ---
 st.sidebar.header("Snowflake 接続情報")
@@ -20,6 +20,7 @@ if st.sidebar.button("接続"):
     except Exception as e:
         st.sidebar.error(f"接続失敗: {e}")
 
+st.title("Snowflake パラメータ確認ツール")
 
 with st.expander("ツールの目的と概要", expanded=True):
     st.markdown("""
