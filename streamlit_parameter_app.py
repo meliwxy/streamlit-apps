@@ -115,7 +115,6 @@ if "conn" in st.session_state:
         
         if "WAREHOUSE" in levels:
             targets = warehouse_list if "ALL" in selected_whs else selected_whs
-            failed_whs = []
             for wh in targets:
                 try:
                     safe_wh = escape_identifier(wh)
@@ -124,18 +123,11 @@ if "conn" in st.session_state:
                     except:
                         pass
         
-                    df_raw = run_show_and_fetch(f'SHOW PARAMETERS IN WAREHOUSE {safe_wh}')
-                    if df_raw is None or len(df_raw) == 0:
+                    df = run_show_and_fetch(f'SHOW PARAMETERS IN WAREHOUSE {safe_wh}')
+                    if df.empty:
                         raise ValueError("No parameter data returned")
         
-                    df = pd.DataFrame(df_raw)
-                    if df.empty or len(df.columns) != 6:
-                        raise ValueError("Invalid or empty DataFrame")
-        
-                    df.columns = ["key", "value", "default", "level", "description", "type"]
-        
-                    st.subheader(f"パラメータ一覧: {wh}")
-                    st.dataframe(df)
+                    result_dict[f"WAREHOUSE_{wh}"] = df
         
                 except Exception as e:
                     failed_whs.append((wh, str(e)))
@@ -144,7 +136,6 @@ if "conn" in st.session_state:
                 st.warning("以下のウェアハウスのパラメータを取得できませんでした:")
                 for wh, err in failed_whs:
                     st.text(f"{wh}: {err}")
-
 
 
         if result_dict:
