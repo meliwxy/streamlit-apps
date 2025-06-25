@@ -8,7 +8,7 @@ st.sidebar.header("Snowflake 接続情報")
 account = st.sidebar.text_input("Account Identifier", value="", placeholder="例：abc-xy12345")
 user = st.sidebar.text_input("User Name", value="")
 password = st.sidebar.text_input("Password", type="password")
-st.sidebar.markdown("\uff0a個人アカウントをご利用の場合、Duo認証による承認が必要です。")
+st.sidebar.markdown("\uff0a個人アカウントをご利用の場合、Duo認証による承認が必要です。ご確認ください。")
 
 if st.sidebar.button("接続"):
     try:
@@ -19,6 +19,7 @@ if st.sidebar.button("接続"):
         st.sidebar.error(f"接続失敗: {e}")
 
 # --- Title & Introduction ---
+st.set_page_config(layout="wide")
 st.title("Snowflake パラメータ確認ツール")
 
 
@@ -120,7 +121,7 @@ if "conn" in st.session_state:
             )
             for name, df in result_dict.items():
                 st.subheader(name)
-                st.dataframe(df, use_container_width=True, height=500)
+                st.dataframe(df, use_container_width=True)
             st.info("ダウンロードが完了しました")
         else:
             st.warning("選択された対象のパラメータを取得できませんでした")
