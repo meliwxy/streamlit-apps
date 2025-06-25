@@ -52,12 +52,20 @@ if "conn" in st.session_state:
         selected_dbs = []
 
     if "WAREHOUSE" in levels:
-        cursor.execute("SHOW WAREHOUSES")
-        warehouse_list = [row[1] for row in cursor.fetchall()]
-        selected_whs = st.multiselect("対象ウェアハウス", ["ALL"] + warehouse_list, default="ALL")
+        targets = warehouse_list if "ALL" in selected_whs else selected_whs
+        failed_whs = []
+        for wh in targets:
+            try:
+                df = run_show_and_fetch(f"SHOW PARAMETERS IN WAREHOUSE {wh}")
+                result_dict[f"WAREHOUSE_{wh}"] = df
+            except Exception as e:
+                failed_whs.append(wh)
+        if failed_whs:
+            st.warning("一部のウェアハウスのパラメータ取得に失敗しました：" + ", ".join(failed_whs))
     else:
         selected_whs = []
 
+    
     def run_show_and_fetch(sql):
         cursor.execute(sql)
         df = pd.DataFrame(cursor.fetchall(), columns=[col[0] for col in cursor.description])
