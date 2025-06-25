@@ -56,10 +56,11 @@ if "conn" in st.session_state:
         raw_warehouses = cursor.fetchall()
         warehouse_list = [row[0] for row in raw_warehouses if row[0].isidentifier()]
         invalid_whs = [row[0] for row in raw_warehouses if not row[0].isidentifier()]
+    
         selected_whs = st.multiselect("対象ウェアハウス（複数選択可）", ["ALL"] + warehouse_list, default=["ALL"])
     else:
         selected_whs = []
-    
+
     def run_show_and_fetch(sql):
         cursor.execute(sql)
         df = pd.DataFrame(cursor.fetchall(), columns=[col[0] for col in cursor.description])
@@ -125,10 +126,12 @@ if "conn" in st.session_state:
                 st.warning("以下のウェアハウスのパラメータを取得できませんでした:")
                 for wh, err in failed_whs:
                     st.text(f"{wh}: {err}")
+        
             if invalid_whs:
                 st.warning("無効な名前（SQL識別子ではない）として除外されたWAREHOUSE:")
                 for wh in invalid_whs:
                     st.text(wh)
+
         
         if result_dict:
             st.success("パラメータ取得完了")
