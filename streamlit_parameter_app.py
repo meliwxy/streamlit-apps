@@ -53,7 +53,7 @@ if "conn" in st.session_state:
 
     if "WAREHOUSE" in levels:
         cursor.execute("SHOW WAREHOUSES")
-        warehouse_list = [row[1] for row in cursor.fetchall()]
+        warehouse_list = [row[0] for row in cursor.fetchall()]
         selected_whs = st.multiselect("対象ウェアハウス（複数選択可）", ["ALL"] + warehouse_list, default=["ALL"])
     else:
         selected_whs = []
