@@ -105,14 +105,13 @@ if "conn" in st.session_state:
                 
         if "WAREHOUSE" in levels:
             targets = warehouse_list if "ALL" in selected_whs else selected_whs
+            failed_whs = []
             for wh in targets:
                 try:
-                    df = run_show_and_fetch(f"SHOW PARAMETERS IN WAREHOUSE {wh}")
-                    result_dict[f"WAREHOUSE_{wh}"] = df
+                    cursor.execute(f"USE WAREHOUSE {wh}")
+                    params = cursor.execute("SHOW PARAMETERS IN WAREHOUSE").fetchall()
                 except Exception as e:
-                    failed_whs.append(wh)
-        if failed_whs:
-            st.warning(f"以下のウェアハウスは取得に失敗しました：{', '.join(failed_whs)}")
+                    failed_whs.append((wh, str(e)))
 
         if result_dict:
             st.success("パラメータ取得完了")
