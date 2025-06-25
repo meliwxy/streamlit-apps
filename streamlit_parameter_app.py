@@ -106,7 +106,8 @@ if "conn" in st.session_state:
         if "SESSION" in levels:
             df = run_show_and_fetch("SHOW PARAMETERS IN SESSION")
             result_dict["SESSION"] = df
-
+        
+        failed_dbs = []
         if "DATABASE" in levels:
             targets = database_list if "ALL" in selected_dbs else selected_dbs
             for db in targets:
