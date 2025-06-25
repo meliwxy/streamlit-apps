@@ -107,7 +107,7 @@ if "conn" in st.session_state:
         if "WAREHOUSE" in levels:
             targets = warehouse_list if "ALL" in selected_whs else selected_whs
             for wh in targets:
-                df = run_show_and_fetch(f"SHOW PARAMETERS IN WAREHOUSE {db}")
+                df = run_show_and_fetch(f"SHOW PARAMETERS IN WAREHOUSE {wh}")
                 result_dict[f"WAREHOUSE_{wh}"] = df
 
         if result_dict:
