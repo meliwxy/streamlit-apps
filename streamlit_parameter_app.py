@@ -3,6 +3,8 @@ import pandas as pd
 import snowflake.connector
 from io import BytesIO
 
+st.set_page_config(page_title="Snowflake パラメータ確認ツール", layout="wide", initial_sidebar_state="expanded")
+
 # --- Sidebar: Snowflake credentials ---
 st.sidebar.header("Snowflake 接続情報")
 account = st.sidebar.text_input("Account Identifier", value="", placeholder="例：abc-xy12345")
@@ -17,10 +19,6 @@ if st.sidebar.button("接続"):
         st.sidebar.success("接続成功")
     except Exception as e:
         st.sidebar.error(f"接続失敗: {e}")
-
-# --- Title & Introduction ---
-st.set_page_config(layout="wide")
-st.title("Snowflake パラメータ確認ツール")
 
 
 with st.expander("ツールの目的と概要", expanded=True):
