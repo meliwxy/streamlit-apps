@@ -110,9 +110,17 @@ if "conn" in st.session_state:
         if "DATABASE" in levels:
             targets = database_list if "ALL" in selected_dbs else selected_dbs
             for db in targets:
-                df = run_show_and_fetch(f"SHOW PARAMETERS IN DATABASE {db}")
-                result_dict[f"DATABASE_{db}"] = df
-        
+                try:
+                    safe_db = escape_identifier(db)
+                    df = run_show_and_fetch(f"SHOW PARAMETERS IN DATABASE {safe_db}")
+                    result_dict[f"DATABASE_{db}"] = df
+                except Exception as e:
+                    failed_dbs.append((db, str(e)))
+        if failed_dbs:
+            st.warning("以下のデータベースのパラメータを取得できませんでした:")
+            for db, err in failed_dbs:
+                st.text(f"{db}: {err}")
+
         if "WAREHOUSE" in levels:
             targets = warehouse_list if "ALL" in selected_whs else selected_whs
             for wh in targets:
