@@ -54,9 +54,7 @@ if "conn" in st.session_state:
     if "WAREHOUSE" in levels:
         cursor.execute("SHOW WAREHOUSES")
         raw_warehouses = cursor.fetchall()
-        warehouse_list = [row[0] for row in raw_warehouses if row[0].isidentifier()]
-        invalid_whs = [row[0] for row in raw_warehouses if not row[0].isidentifier()]
-    
+        warehouse_list = [row[0] for row in raw_warehouses]    
         selected_whs = st.multiselect("対象ウェアハウス（複数選択可）", ["ALL"] + warehouse_list, default=["ALL"])
     else:
         selected_whs = []
@@ -108,31 +106,10 @@ if "conn" in st.session_state:
 
         if "WAREHOUSE" in levels:
             targets = warehouse_list if "ALL" in selected_whs else selected_whs
-            failed_whs = []
             for wh in targets:
-                try:
-                    cursor.execute(f"ALTER WAREHOUSE {wh} RESUME")
-                    cursor.execute(f"USE WAREHOUSE {wh}")
-                    params = cursor.execute("SHOW PARAMETERS IN WAREHOUSE").fetchall()
-        
-                    st.subheader(f"パラメータ一覧: {wh}")
-                    for param in params:
-                        st.write(param)
-        
-                except Exception as e:
-                    failed_whs.append((wh, str(e)))
-        
-            if failed_whs:
-                st.warning("以下のウェアハウスのパラメータを取得できませんでした:")
-                for wh, err in failed_whs:
-                    st.text(f"{wh}: {err}")
-        
-            if invalid_whs:
-                st.warning("無効な名前（SQL識別子ではない）として除外されたWAREHOUSE:")
-                for wh in invalid_whs:
-                    st.text(wh)
+                df = run_show_and_fetch(f"SHOW PARAMETERS IN WAREHOUSE {db}")
+                result_dict[f"WAREHOUSE_{wh}"] = df
 
-        
         if result_dict:
             st.success("パラメータ取得完了")
             excel_file = to_excel_multi_sheet(result_dict)
