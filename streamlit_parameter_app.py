@@ -54,7 +54,7 @@ if "conn" in st.session_state:
     if "WAREHOUSE" in levels:
         cursor.execute("SHOW WAREHOUSES")
         warehouse_list = [row[1] for row in cursor.fetchall()]
-        selected_whs = st.multiselect("対象ウェアハウス（複数選択可）", ["ALL"] + warehouse_list, default="ALL")
+        selected_whs = st.multiselect("対象ウェアハウス（複数選択可）", ["ALL"] + warehouse_list, default=["ALL"])
     else:
         selected_whs = []
     
@@ -102,17 +102,28 @@ if "conn" in st.session_state:
             for db in targets:
                 df = run_show_and_fetch(f"SHOW PARAMETERS IN DATABASE {db}")
                 result_dict[f"DATABASE_{db}"] = df
-                
+
         if "WAREHOUSE" in levels:
             targets = warehouse_list if "ALL" in selected_whs else selected_whs
             failed_whs = []
             for wh in targets:
                 try:
+                    cursor.execute(f"ALTER WAREHOUSE {wh} RESUME")
                     cursor.execute(f"USE WAREHOUSE {wh}")
                     params = cursor.execute("SHOW PARAMETERS IN WAREHOUSE").fetchall()
+        
+                    st.subheader(f"パラメータ一覧: {wh}")
+                    for param in params:
+                        st.write(param)
+        
                 except Exception as e:
                     failed_whs.append((wh, str(e)))
-
+        
+            if failed_whs:
+                st.warning("以下のウェアハウスのパラメータを取得できませんでした:")
+                for wh, err in failed_whs:
+                    st.text(f"{wh}: {err}")
+        
         if result_dict:
             st.success("パラメータ取得完了")
             excel_file = to_excel_multi_sheet(result_dict)
