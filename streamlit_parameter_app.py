@@ -8,24 +8,25 @@ st.sidebar.header("Snowflake 接続情報")
 account = st.sidebar.text_input("Account Identifier", value="", placeholder="例：abc-xy12345")
 user = st.sidebar.text_input("User Name", value="")
 password = st.sidebar.text_input("Password", type="password")
-st.sidebar.markdown("※ 個人アカウントをご利用の場合、Duo認証による承認が必要です。ご確認ください。")
+st.sidebar.markdown("\uff0a個人アカウントをご利用の場合、Duo認証による承認が必要です。")
 
 if st.sidebar.button("接続"):
     try:
         conn = snowflake.connector.connect(user=user, password=password, account=account)
         st.session_state["conn"] = conn
-        st.sidebar.success("接続成功！")
+        st.sidebar.success("接続成功")
     except Exception as e:
         st.sidebar.error(f"接続失敗: {e}")
 
 # --- Title & Introduction ---
 st.title("Snowflake パラメータ確認ツール")
 
+
 with st.expander("ツールの目的と概要", expanded=True):
     st.markdown("""
-    本ツールは、**Snowflake環境における各種設定パラメータ**を手軽に一括確認・出力するためのアプリです。
+    本ツールは、Snowflake環境における各種設定パラメータを手軽に一括確認・出力するためのアプリです。
 
-    通常 `SHOW PARAMETERS` コマンドを手動で実行する必要がありますが、本ツールでは対象を選択し、まとめて取得・確認・Excel出力が可能です。
+    `SHOW PARAMETERS` コマンドを個別に実行する必要なく、選択した対象をまとめて取得・確認・Excel出力できます。
 
     **活用例：**
     - 開発者・管理者による設定確認
@@ -46,21 +47,21 @@ if "conn" in st.session_state:
     if "DATABASE" in levels:
         cursor.execute("SHOW DATABASES")
         database_list = [row[1] for row in cursor.fetchall()]
-        selected_dbs = st.multiselect("対象データベース（複数選択可）", ["ALL"] + database_list, default="ALL")
+        selected_dbs = st.multiselect("対象データベース", ["ALL"] + database_list, default="ALL")
     else:
         selected_dbs = []
 
     if "WAREHOUSE" in levels:
         cursor.execute("SHOW WAREHOUSES")
         warehouse_list = [row[1] for row in cursor.fetchall()]
-        selected_whs = st.multiselect("対象ウェアハウス（複数選択可）", ["ALL"] + warehouse_list, default="ALL")
+        selected_whs = st.multiselect("対象ウェアハウス", ["ALL"] + warehouse_list, default="ALL")
     else:
         selected_whs = []
 
     def run_show_and_fetch(sql):
         cursor.execute(sql)
         df = pd.DataFrame(cursor.fetchall(), columns=[col[0] for col in cursor.description])
-        col_rename = {
+        rename_dict = {
             "key": "key / キー",
             "value": "value / 値",
             "default": "default / デフォルト",
@@ -68,8 +69,7 @@ if "conn" in st.session_state:
             "description": "description / 説明",
             "type": "type / タイプ"
         }
-        df.columns = [col_rename.get(c.lower(), c) for c in df.columns]
-        return df
+        return df.rename(columns={col: rename_dict.get(col, col) for col in df.columns})
 
     def to_excel_multi_sheet(df_dict):
         output = BytesIO()
@@ -78,7 +78,10 @@ if "conn" in st.session_state:
                 df.to_excel(writer, sheet_name=sheet[:31], index=False, startrow=1, header=False)
                 ws = writer.sheets[sheet[:31]]
                 for col_num, value in enumerate(df.columns.values):
-                    ws.write(0, col_num, value)
+                    ws.write(0, col_num, value, writer.book.add_format({'bold': True}))
+                col_widths = [50, 20, 30, 10, 80, 10]
+                for i, width in enumerate(col_widths):
+                    ws.set_column(i, i, width)
         output.seek(0)
         return output
 
@@ -106,12 +109,18 @@ if "conn" in st.session_state:
                 result_dict[f"WAREHOUSE_{wh}"] = df
 
         if result_dict:
-            excel_file = to_excel_multi_sheet(result_dict)
-            st.download_button("Excelとしてダウンロード", data=excel_file, file_name="snowflake_parameters.xlsx", mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
-
             st.success("パラメータ取得完了")
+            excel_file = to_excel_multi_sheet(result_dict)
+            st.download_button(
+                "Excelとしてダウンロード",
+                data=excel_file,
+                file_name="snowflake_parameters.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                key="download-excel"
+            )
             for name, df in result_dict.items():
-                st.subheader(f"{name}")
-                st.dataframe(df, use_container_width=True, height=400)
+                st.subheader(name)
+                st.dataframe(df, use_container_width=True, height=500)
+            st.info("ダウンロードが完了しました")
         else:
-            st.warning("選択された対象のパラメータを取得できませんでした。")
+            st.warning("選択された対象のパラメータを取得できませんでした")
