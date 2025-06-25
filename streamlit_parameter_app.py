@@ -1,5 +1,6 @@
 import streamlit as st
 import pandas as pd
+import re
 import snowflake.connector
 from io import BytesIO
 
@@ -124,12 +125,11 @@ if "conn" in st.session_state:
                         pass
         
                     df_raw = run_show_and_fetch(f'SHOW PARAMETERS IN WAREHOUSE {safe_wh}')
-        
-                    if not df_raw:
+                    if df_raw is None or len(df_raw) == 0:
                         raise ValueError("No parameter data returned")
         
                     df = pd.DataFrame(df_raw)
-                    if df.empty or df.shape[1] != 6:
+                    if df.empty or len(df.columns) != 6:
                         raise ValueError("Invalid or empty DataFrame")
         
                     df.columns = ["key", "value", "default", "level", "description", "type"]
@@ -144,6 +144,7 @@ if "conn" in st.session_state:
                 st.warning("以下のウェアハウスのパラメータを取得できませんでした:")
                 for wh, err in failed_whs:
                     st.text(f"{wh}: {err}")
+
 
 
         if result_dict:
