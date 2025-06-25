@@ -4,7 +4,7 @@ import snowflake.connector
 from io import BytesIO
 
 # --- Sidebar: Snowflake credentials ---
-st.sidebar.header("Snowflake 接続")
+st.sidebar.header("Snowflake アカウント接続")
 account = st.sidebar.text_input("Account", value="your_account")
 user = st.sidebar.text_input("User", value="your_username")
 password = st.sidebar.text_input("Password", type="password")
