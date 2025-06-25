@@ -54,7 +54,7 @@ if "conn" in st.session_state:
     if "WAREHOUSE" in levels:
         cursor.execute("SHOW WAREHOUSES")
         warehouse_list = [row[1] for row in cursor.fetchall()]
-        selected_whs = st.multiselect("対象ウェアハウスを選択（複数選可）", ["ALL"] + warehouse_list, default="ALL")
+        selected_whs = st.multiselect("対象ウェアハウス（複数選択可）", ["ALL"] + warehouse_list, default="ALL")
     else:
         selected_whs = []
     
@@ -87,6 +87,7 @@ if "conn" in st.session_state:
 
     if st.button("パラメータを取得"):
         result_dict = {}
+        failed_whs = []
 
         if "ACCOUNT" in levels:
             df = run_show_and_fetch("SHOW PARAMETERS IN ACCOUNT")
@@ -101,19 +102,17 @@ if "conn" in st.session_state:
             for db in targets:
                 df = run_show_and_fetch(f"SHOW PARAMETERS IN DATABASE {db}")
                 result_dict[f"DATABASE_{db}"] = df
-
+                
         if "WAREHOUSE" in levels:
             targets = warehouse_list if "ALL" in selected_whs else selected_whs
-            failed_whs = []
             for wh in targets:
                 try:
-                    cursor.execute(f"ALTER WAREHOUSE {wh} RESUME")
                     df = run_show_and_fetch(f"SHOW PARAMETERS IN WAREHOUSE {wh}")
                     result_dict[f"WAREHOUSE_{wh}"] = df
-                except Exception:
+                except Exception as e:
                     failed_whs.append(wh)
-            if failed_whs:
-                st.warning(f"一部のウェアハウスの取得に失敗しました: {', '.join(failed_whs)}")
+        if failed_whs:
+            st.warning(f"以下のウェアハウスは取得に失敗しました：{', '.join(failed_whs)}")
 
         if result_dict:
             st.success("パラメータ取得完了")
