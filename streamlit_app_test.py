@@ -172,15 +172,14 @@ if st.session_state.conn:
         from snowflake.snowpark import Session
         import io
 
-        # Set up Snowpark Session
         if "snowpark_session" not in st.session_state:
             try:
                 connection_parameters = {
                     "account": account,
                     "user": user,
                     "password": password,
-                    "role": "ACCOUNTADMIN",  
-                    "warehouse": "default",  
+                    "role": "ACCOUNTADMIN",
+                    "warehouse": "default",
                 }
                 st.session_state.snowpark_session = Session.builder.configs(connection_parameters).create()
             except Exception as e:
@@ -190,19 +189,16 @@ if st.session_state.conn:
         session = st.session_state.snowpark_session
 
         st.markdown("### 出力形式の選択")
-
         option = st.radio(
             "出力形式を選択してください",
             ("プレビュー表示", "Excelとしてダウンロード（全テーブル）", "Excelとしてダウンロード（選択テーブルのみ）"),
             index=0
         )
 
-        
-        # 表选择UI（"選択テーブルのみ" モードの場合に表示）
+        selected_tables = []
         if "table_options" not in st.session_state:
             st.session_state.table_options = []
 
-        selected_tables = []
         if option == "Excelとしてダウンロード（選択テーブルのみ）":
             if not st.session_state.table_options:
                 st.info("🔄 先に一度「取得する」ボタンを押して、テーブル一覧を読み込んでください。")
@@ -211,14 +207,11 @@ if st.session_state.conn:
 
         if st.button("取得する"):
             with st.spinner("テーブル情報を取得中です..."):
-                # 1. Collect all DB, exclude sample
                 df_dbs = session.sql("SHOW DATABASES").to_pandas()
-                df_dbs.columns = [str(col) for col in df_dbs.columns]
-                db_name_col = df_dbs.columns[1] 
+                db_name_col = df_dbs.columns[1]
                 database_names = df_dbs[db_name_col].tolist()
                 database_names = [db for db in database_names if db.upper() != "SNOWFLAKE_SAMPLE_DATA"]
 
-                # 2. Collect all tables
                 df_all_tables = pd.DataFrame()
                 for db in database_names:
                     try:
@@ -235,10 +228,9 @@ if st.session_state.conn:
                 df_all_tables.columns = [col.lower() for col in df_all_tables.columns]
                 table_entries = df_all_tables.to_dict("records")
 
-                tables = []
                 df_def_all = pd.DataFrame()
+                st.session_state.table_options = []
 
-                # 3. Collect table definication & sample data
                 for entry in table_entries:
                     db = entry["table_catalog"]
                     schema = entry["table_schema"]
@@ -246,7 +238,6 @@ if st.session_state.conn:
                     full_name = f"{db}.{schema}.{tbl}"
                     st.session_state.table_options.append(full_name)
 
-                    # Definition
                     try:
                         quoted_name = f'"{db}"."{schema}"."{tbl}"'
                         df_desc = session.sql(f"DESCRIBE TABLE {quoted_name}").to_pandas()
@@ -257,178 +248,33 @@ if st.session_state.conn:
                             "3": "nullable",
                             "5": "primary_key",
                             "9": "comment"
-                        })
-                        df_desc = df_desc[["column_name", "data_type", "nullable", "primary_key", "comment"]]
-
+                        })[["column_name", "data_type", "nullable", "primary_key", "comment"]]
                         df_desc["database_name"] = db
                         df_desc["schema_name"] = schema
                         df_desc["table_name"] = tbl
                         df_def_all = pd.concat([df_def_all, df_desc], ignore_index=True)
                     except Exception as e:
-                        df_columns = pd.DataFrame([["取得失敗"]], columns=["Error"])
-                        st.warning(f"⚠️ 定義取得エラー（{full_name}）: {e}")
+                        st.warning(f"❌ テーブル {full_name} の定義取得に失敗: {e}")
 
-                    # Sample data
-                    try:
-                        df_sample = session.sql(f"SELECT * FROM {full_name} LIMIT 10").to_pandas()
-                    except:
-                        df_sample = pd.DataFrame([["取得失敗"]], columns=["Error"])
+                if option == "プレビュー表示":
+                    st.dataframe(df_def_all)
 
-                    tables.append({
-                        "full_name": full_name,
-                        "sample_df": df_sample
-                    })
+                elif option.startswith("Excelとしてダウンロード"):
+                    if "選択" in option and selected_tables:
+                        df_export = df_def_all[df_def_all.apply(
+                            lambda row: f"{row['database_name']}.{row['schema_name']}.{row['table_name']}" in selected_tables,
+                            axis=1
+                        )]
+                    elif "選択" in option and not selected_tables:
+                        st.warning("⚠️ テーブルを選択してください。")
+                        st.stop()
+                    else:
+                        df_export = df_def_all
 
-                st.session_state["df_def_all"] = df_def_all
-                st.session_state["tables"] = tables
+                    excel_io = io.BytesIO()
+                    df_export.to_excel(excel_io, index=False)
+                    st.download_button("📥 Excelファイルをダウンロード", excel_io.getvalue(), file_name="table_definitions.xlsx")
 
-                # 4. Output
-        if "df_def_all" in st.session_state and not st.session_state["df_def_all"].empty:
-            df_def_all = st.session_state["df_def_all"]
-            tables = st.session_state["tables"]
-            if option == "プレビュー表示":        
-                st.success("✅ データベース構造と各テーブルの定義情報を以下に表示します。")
-            
-                # --- Tree view
-                
-                dot_lines = ["digraph G {", "rankdir=LR;", 'node [shape=box];']
-                grouped = df_def_all.groupby(["database_name", "schema_name", "table_name"])
-                
-                db_schema_edges = set()
-                schema_table_edges = set()
-                
-                for (db, schema, tbl), _ in grouped:
-                    db_node = db
-                    schema_node = f"{db}.{schema}"
-                    table_node = f"{db}.{schema}.{tbl}"
-                
-                    if (db_node, schema_node) not in db_schema_edges:
-                        dot_lines.append(f'"{db_node}" -> "{schema_node}"')
-                        db_schema_edges.add((db_node, schema_node))
-                
-                    if (schema_node, table_node) not in schema_table_edges:
-                        dot_lines.append(f'"{schema_node}" -> "{table_node}"')
-                        schema_table_edges.add((schema_node, table_node))
-                
-                dot_lines.append("}")
-                dot_source = "\n".join(dot_lines)
-
-                with st.expander("### データベース構造（DB → スキーマ → テーブル）"):
-                    st.graphviz_chart(dot_source)
-            
-                # --- Tabke definition
-                with st.expander("### 各テーブルの定義書"):
-                    for (db, schema, tbl), df_group in grouped:
-                        full_name = f"{db}.{schema}.{tbl}"
-                    st.session_state.table_options.append(full_name)
-                        df_show = df_group[["column_name", "data_type", "nullable", "primary_key", "comment"]].reset_index(drop=True)
-                        st.markdown(f"#### {full_name}")
-                        st.dataframe(df_show, use_container_width=True)
-                # --- Sample data
-                with st.expander("### 各テーブルのサンプルデータ"):
-                    for table in tables:
-                        st.markdown(f"#### テーブル： {table['full_name']}")
-                        st.dataframe(table["sample_df"], use_container_width=True)
-
-                st.markdown("""
-                <style>
-                .back-to-top-button {
-                    position: fixed;
-                    bottom: 40px;
-                    right: 30px;
-                    z-index: 100;
-                }
-                .back-to-top-button button {
-                    padding: 10px 18px;
-                    font-size: 14px;
-                    background-color: #f0f0f0;
-                    border: 1px solid #ccc;
-                    border-radius: 6px;
-                    cursor: pointer;
-                }
-                .back-to-top-button button:hover {
-                    background-color: #e0e0e0;
-                }
-                </style>
-
-                <div class="back-to-top-button">
-                    <a href="#top">
-                        <button>🔝 Back to Top</button>
-                    </a>
-                </div>
-                """, unsafe_allow_html=True)
-
-
-            elif option == "Excelとしてダウンロード（全テーブル）":
-                output = io.BytesIO()
-
-                with pd.ExcelWriter(output, engine='openpyxl') as writer:
-
-                    # Sheet1
-                    df_def_all_csv = df_def_all[
-                        ["database_name", "schema_name", "table_name", "column_name", "data_type", "nullable", "primary_key", "comment"]
-                    ].sort_values(["database_name", "schema_name", "table_name", "column_name"])
-
-                    df_def_all_csv.to_excel(writer, index=False, sheet_name="All_Tables_Overview")
-
-                    # Sheet2〜
-                    grouped = df_def_all.groupby(["database_name", "schema_name", "table_name"])
-                    for (db, schema, tbl), df_group in grouped:
-                        sheet_name = f"{tbl}"[:31] 
-                        df_table_def = df_group[
-                            ["column_name", "data_type", "nullable", "primary_key", "comment"]
-                        ]
-                        df_table_def.to_excel(writer, index=False, sheet_name=sheet_name)
-
-                st.download_button(
-                    label="ダウンロード",
-                    data=output.getvalue(),
-                    file_name="table_definitions.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                )
-
-            elif option == "Excelとしてダウンロード（選択テーブルのみ）":
-                # 👇 multiselect 的数据源也从 session 取
-                all_table_names = df_def_all[["database_name", "schema_name", "table_name"]].drop_duplicates()
-                all_table_names["full_name"] = (
-                    all_table_names["database_name"] + "." +
-                    all_table_names["schema_name"] + "." +
-                    all_table_names["table_name"]
-                )
-
-                selected_tables = st.multiselect(
-                    "出力対象のテーブルを選択してください",
-                    options=all_table_names["full_name"].tolist(),
-                    key="selected_tables_key"
-                )
-
-                if selected_tables:
-                    output = io.BytesIO()
-                    df_def_all["full_name"] = (
-                        df_def_all["database_name"] + "." +
-                        df_def_all["schema_name"] + "." +
-                        df_def_all["table_name"]
-                    )
-                    df_def_selected = df_def_all[df_def_all["full_name"].isin(selected_tables)]
-
-                    with pd.ExcelWriter(output, engine='openpyxl') as writer:
-                        df_def_selected_csv = df_def_selected[
-                            ["database_name", "schema_name", "table_name", "column_name", "data_type", "nullable", "primary_key", "comment"]
-                        ].sort_values(["database_name", "schema_name", "table_name", "column_name"])
-                        df_def_selected_csv.to_excel(writer, index=False, sheet_name="Selected_Tables_Overview")
-
-                        grouped = df_def_selected.groupby(["database_name", "schema_name", "table_name"])
-                        for (db, schema, tbl), df_group in grouped:
-                            sheet_name = f"{tbl}"[:31]
-                            df_table_def = df_group[["column_name", "data_type", "nullable", "primary_key", "comment"]]
-                            df_table_def.to_excel(writer, index=False, sheet_name=sheet_name)
-
-                    st.download_button(
-                        label="選択テーブルをダウンロード",
-                        data=output.getvalue(),
-                        file_name="selected_table_definitions.xlsx",
-                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-                    )
 
     with tabs[2]:
         st.header("ロールと権限の一覧")
