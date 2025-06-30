@@ -197,6 +197,18 @@ if st.session_state.conn:
             index=0
         )
 
+        
+        # 表选择UI（"選択テーブルのみ" モードの場合に表示）
+        if "table_options" not in st.session_state:
+            st.session_state.table_options = []
+
+        selected_tables = []
+        if option == "Excelとしてダウンロード（選択テーブルのみ）":
+            if not st.session_state.table_options:
+                st.info("🔄 先に一度「取得する」ボタンを押して、テーブル一覧を読み込んでください。")
+            else:
+                selected_tables = st.multiselect("📋 ダウンロード対象テーブルを選択", st.session_state.table_options)
+
         if st.button("取得する"):
             with st.spinner("テーブル情報を取得中です..."):
                 # 1. Collect all DB, exclude sample
@@ -232,6 +244,7 @@ if st.session_state.conn:
                     schema = entry["table_schema"]
                     tbl = entry["table_name"]
                     full_name = f"{db}.{schema}.{tbl}"
+                    st.session_state.table_options.append(full_name)
 
                     # Definition
                     try:
@@ -307,6 +320,7 @@ if st.session_state.conn:
                 with st.expander("### 各テーブルの定義書"):
                     for (db, schema, tbl), df_group in grouped:
                         full_name = f"{db}.{schema}.{tbl}"
+                    st.session_state.table_options.append(full_name)
                         df_show = df_group[["column_name", "data_type", "nullable", "primary_key", "comment"]].reset_index(drop=True)
                         st.markdown(f"#### {full_name}")
                         st.dataframe(df_show, use_container_width=True)
