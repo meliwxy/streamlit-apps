@@ -14,6 +14,9 @@ user = st.sidebar.text_input("User Name", value="")
 password = st.sidebar.text_input("Password", type="password")
 st.sidebar.markdown("\uff0a個人アカウントをご利用の場合、Duo認証による承認が必要です。ご確認ください。")
 
+if "conn" not in st.session_state:
+    st.session_state.conn = None
+
 if st.sidebar.button("接続"):
     try:
         conn = snowflake.connector.connect(user=user, password=password, account=account)
