@@ -526,9 +526,12 @@ if st.session_state.conn:
                 excel_io = BytesIO()
                 with pd.ExcelWriter(excel_io, engine="openpyxl") as writer:
                     for name, df in grant_results.items():
+                    for name, df in grant_results.items():
                         sheet_name = safe_sheet_name(name)
-                        df.to_excel(writer, index=False, sheet_name=sheet_name)
-
+                        try:
+                            df.astype(str).to_excel(writer, index=False, sheet_name=sheet_name)
+                        except Exception as e:
+                            st.warning(f"❌ Excel出力エラー（{sheet_name}）: {e}")
                 st.download_button("📥 Excelでダウンロード", data=excel_io.getvalue(), file_name="object_grants_by_level.xlsx")
 
 else:
