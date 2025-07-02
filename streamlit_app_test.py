@@ -420,7 +420,7 @@ if st.session_state.conn:
                     )
 
     with tabs[2]:
-        st.markdown("### データベース・スキーマ・テーブルの権限一覧")
+        st.markdown("### データベース・スキーマ・テーブルの権限一覧（階層別表示）")
 
         conn = st.session_state.get("conn")
         if not conn:
@@ -433,16 +433,12 @@ if st.session_state.conn:
         cursor.execute("SHOW DATABASES")
         all_dbs = [row[1] for row in cursor.fetchall()]
         dbs_display = ["ALL"] + all_dbs
-        selected_dbs = st.multiselect("📁 データベースを選択", dbs_display, default=["ALL"])
-
-        if "ALL" in selected_dbs or not selected_dbs:
-            active_dbs = all_dbs
-        else:
-            active_dbs = selected_dbs
+        selected_dbs = st.multiselect("📁 データベースを選択（DB権限表示）", dbs_display, default=["ALL"])
+        active_dbs = all_dbs if "ALL" in selected_dbs or not selected_dbs else selected_dbs
 
         # ---- スキーマ選択 ----
         schema_display = []
-        schema_map = {}  # db.schema -> [db, schema]
+        schema_map = {}
         for db in active_dbs:
             try:
                 cursor.execute(f"SHOW SCHEMAS IN DATABASE {db}")
@@ -455,12 +451,10 @@ if st.session_state.conn:
                 st.warning(f"{db} のスキーマ取得に失敗しました。")
 
         schema_display = ["ALL"] + schema_display
-        selected_schemas = st.multiselect("📂 スキーマを選択", schema_display, default=["ALL"])
-
-        if "ALL" in selected_schemas or not selected_schemas:
-            active_schemas = list(schema_map.values())
-        else:
-            active_schemas = [schema_map[s] for s in selected_schemas if s in schema_map]
+        selected_schemas = st.multiselect("📂 スキーマを選択（スキーマ権限表示）", schema_display)
+        active_schemas = list(schema_map.values()) if "ALL" in selected_schemas else [
+            schema_map[s] for s in selected_schemas if s in schema_map
+        ]
 
         # ---- テーブル選択 ----
         table_display = []
@@ -474,24 +468,68 @@ if st.session_state.conn:
                 st.warning(f"{db}.{schema} のテーブル取得に失敗しました。")
 
         table_display = ["ALL"] + table_display
-        selected_tables = st.multiselect("📄 テーブルを選択", table_display, default=["ALL"])
+        selected_tables = st.multiselect("📄 テーブルを選択（テーブル権限表示）", table_display)
+        active_tables = [t for t in table_display if t != "ALL"] if "ALL" in selected_tables else selected_tables
 
-        if "ALL" in selected_tables or not selected_tables:
-            active_tables = [t for t in table_display if t != "ALL"]
-        else:
-            active_tables = selected_tables
-
-        # ---- 実行ボタン & 表示 ----
+        # ---- 実行 & 表示 ----
         if st.button("権限情報を取得"):
-            with st.spinner("権限情報を取得中..."):
-                for tbl_full in active_tables:
-                    try:
-                        cursor.execute(f"SHOW GRANTS ON TABLE {tbl_full}")
-                        df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
-                        st.subheader(f"🔐 {tbl_full}")
-                        st.dataframe(df)
-                    except:
-                        st.warning(f"{tbl_full} の権限取得に失敗しました")
+            grant_results = {}
+
+            # DBレベル
+            for db in active_dbs:
+                try:
+                    cursor.execute(f"SHOW GRANTS ON DATABASE {db}")
+                    df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+                    grant_results[f"{db} [DATABASE]"] = df
+                except:
+                    st.warning(f"⚠️ DATABASE {db} のGRANT取得失敗")
+
+            # SCHEMAレベル
+            for db, schema in active_schemas:
+                try:
+                    cursor.execute(f"SHOW GRANTS ON SCHEMA {db}.{schema}")
+                    df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+                    grant_results[f"{db}.{schema} [SCHEMA]"] = df
+                except:
+                    st.warning(f"⚠️ SCHEMA {db}.{schema} のGRANT取得失敗")
+
+            # TABLEレベル
+            for tbl_full in active_tables:
+                try:
+                    cursor.execute(f"SHOW GRANTS ON TABLE {tbl_full}")
+                    df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+                    grant_results[f"{tbl_full} [TABLE]"] = df
+                except:
+                    st.warning(f"⚠️ TABLE {tbl_full} のGRANT取得失敗")
+
+            # 表示 & ダウンロード
+            for name, df in grant_results.items():
+                st.subheader(f"🔐 {name}")
+                st.dataframe(df)
+
+            if grant_results:
+                from io import BytesIO
+                import re
+                used_sheet_names = set()
+
+                def safe_sheet_name(name):
+                    name = re.sub(r'[:\\/?*\[\]]', '_', name)
+                    name = name[:31]
+                    base = name
+                    i = 1
+                    while name in used_sheet_names:
+                        name = f"{base[:28]}_{i}"
+                        i += 1
+                    used_sheet_names.add(name)
+                    return name
+
+                excel_io = BytesIO()
+                with pd.ExcelWriter(excel_io, engine="openpyxl") as writer:
+                    for name, df in grant_results.items():
+                        sheet_name = safe_sheet_name(name)
+                        df.to_excel(writer, index=False, sheet_name=sheet_name)
+
+                st.download_button("📥 Excelでダウンロード", data=excel_io.getvalue(), file_name="object_grants_by_level.xlsx")
 
 else:
     st.warning("まず左のサイドバーでSnowflakeに接続してください。")
