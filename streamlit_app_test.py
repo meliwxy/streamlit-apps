@@ -526,7 +526,6 @@ if st.session_state.conn:
                 excel_io = BytesIO()
                 with pd.ExcelWriter(excel_io, engine="openpyxl") as writer:
                     for name, df in grant_results.items():
-                    for name, df in grant_results.items():
                         sheet_name = safe_sheet_name(name)
                         try:
                             df.astype(str).to_excel(writer, index=False, sheet_name=sheet_name)
