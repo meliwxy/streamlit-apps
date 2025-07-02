@@ -420,7 +420,74 @@ if st.session_state.conn:
                     )
 
     with tabs[2]:
-        st.header("ロールと権限の一覧")
+        st.markdown("### データベース・スキーマ・テーブルの権限一覧")
+
+        conn = st.session_state.get("conn")
+        if not conn:
+            st.warning("Snowflake に接続してください。")
+            st.stop()
+
+        cursor = conn.cursor()
+
+        # 1. データベース選択
+        cursor.execute("SHOW DATABASES")
+        dbs = [row[1] for row in cursor.fetchall()]
+        selected_db = st.selectbox("📁 データベースを選択", dbs)
+
+        if selected_db:
+            # 2. スキーマ選択
+            cursor.execute(f"SHOW SCHEMAS IN DATABASE {selected_db}")
+            schemas = [row[1] for row in cursor.fetchall()]
+            selected_schemas = st.multiselect("📂 スキーマを選択", schemas)
+
+            grant_results = {}  # {object_name: grant_df}
+
+            if st.button("権限情報を取得"):
+                with st.spinner("権限情報を取得中..."):
+                    for schema in selected_schemas:
+                        # スキーマのGRANTS
+                        try:
+                            cursor.execute(f"SHOW GRANTS ON SCHEMA {selected_db}.{schema}")
+                            df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+                            grant_results[f"{selected_db}.{schema} [スキーマ]"] = df
+                        except:
+                            st.warning(f"⚠️ SCHEMA {schema} のGRANT取得失敗")
+
+                        # テーブル一覧
+                        try:
+                            cursor.execute(f"SHOW TABLES IN SCHEMA {selected_db}.{schema}")
+                            tables = [row[1] for row in cursor.fetchall()]
+                        except:
+                            tables = []
+
+                        for tbl in tables:
+                            try:
+                                cursor.execute(f'SHOW GRANTS ON TABLE {selected_db}.{schema}.{tbl}')
+                                df_tbl = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+                                grant_results[f"{selected_db}.{schema}.{tbl}"] = df_tbl
+                            except:
+                                st.warning(f"⚠️ TABLE {tbl} のGRANT取得失敗")
+
+                    # データベースのGRANTS
+                    try:
+                        cursor.execute(f"SHOW GRANTS ON DATABASE {selected_db}")
+                        df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+                        grant_results[f"{selected_db} [データベース]"] = df
+                    except:
+                        st.warning("⚠️ データベースのGRANT取得失敗")
+
+        # 表示とダウンロード
+        if grant_results:
+            for name, df in grant_results.items():
+                st.subheader(f"🔐 {name}")
+                st.dataframe(df)
+
+            excel_io = BytesIO()
+            with pd.ExcelWriter(excel_io, engine="openpyxl") as writer:
+                for name, df in grant_results.items():
+                    sheet_name = name[-31:] if len(name) > 31 else name
+                    df.to_excel(writer, index=False, sheet_name=sheet_name)
+            st.download_button("📥 Excelでダウンロード", data=excel_io.getvalue(), file_name="object_grants.xlsx")
 
 else:
     st.warning("まず左のサイドバーでSnowflakeに接続してください。")
