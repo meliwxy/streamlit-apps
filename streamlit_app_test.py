@@ -482,11 +482,27 @@ if st.session_state.conn:
                 st.subheader(f"🔐 {name}")
                 st.dataframe(df)
 
+            # --- Excel出力 with sheet名対策 ---
+            import re
+            used_sheet_names = set()
+
+            def safe_sheet_name(name):
+                name = re.sub(r'[:\\/?*\[\]]', '_', name)
+                name = name[:31]
+                base = name
+                i = 1
+                while name in used_sheet_names:
+                    name = f"{base[:28]}_{i}"
+                    i += 1
+                used_sheet_names.add(name)
+                return name
+
             excel_io = BytesIO()
             with pd.ExcelWriter(excel_io, engine="openpyxl") as writer:
                 for name, df in grant_results.items():
-                    sheet_name = name[-31:] if len(name) > 31 else name
+                    sheet_name = safe_sheet_name(name)
                     df.to_excel(writer, index=False, sheet_name=sheet_name)
+
             st.download_button("📥 Excelでダウンロード", data=excel_io.getvalue(), file_name="object_grants.xlsx")
 
 else:
