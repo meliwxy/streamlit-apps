@@ -426,7 +426,7 @@ if st.session_state.conn:
                         mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
                     )
 
-   with tabs[2]:
+    with tabs[2]:
         st.markdown("### データベース・スキーマ・テーブルの権限一覧")
 
         conn = st.session_state.get("conn")
