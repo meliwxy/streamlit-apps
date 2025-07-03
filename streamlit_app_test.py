@@ -447,16 +447,16 @@ if st.session_state.conn:
                 output = io.BytesIO()
                 df_def_all.astype(str).to_excel(output, index=False)
                 st.download_button("Excelでダウンロード", data=output.getvalue(), file_name="table_definitions.xlsx")
-                
-        with tabs[2]:
-                st.markdown("### データベース・スキーマ・テーブルの権限一覧")
 
-                conn = st.session_state.get("conn")
-                if not conn:
-                    st.warning("Snowflake に接続してください。")
-                    st.stop()
+    with tabs[2]:
+        st.markdown("### データベース・スキーマ・テーブルの権限一覧")
 
-                cursor = conn.cursor()
+        conn = st.session_state.get("conn")
+        if not conn:
+            st.warning("Snowflake に接続してください。")
+            st.stop()
+
+        cursor = conn.cursor()
 
         # ---- データベース選択 ----
         cursor.execute("SHOW DATABASES")
