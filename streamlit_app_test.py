@@ -111,72 +111,72 @@ if st.session_state.conn:
 
         if st.button("パラメータを取得"):
             with st.spinner("⏳ パラメータ情報を取得中..."):
-            result_dict = {}
-            failed_whs = []
+                result_dict = {}
+                failed_whs = []
 
-            if "ACCOUNT" in levels:
-                df = run_show_and_fetch("SHOW PARAMETERS IN ACCOUNT")
-                result_dict["ACCOUNT"] = df
+                if "ACCOUNT" in levels:
+                    df = run_show_and_fetch("SHOW PARAMETERS IN ACCOUNT")
+                    result_dict["ACCOUNT"] = df
 
-            if "SESSION" in levels:
-                df = run_show_and_fetch("SHOW PARAMETERS IN SESSION")
-                result_dict["SESSION"] = df
-            
-            failed_dbs = []
-            if "DATABASE" in levels:
-                targets = database_list if "ALL" in selected_dbs else selected_dbs
-                for db in targets:
-                    try:
-                        safe_db = escape_identifier(db)
-                        df = run_show_and_fetch(f"SHOW PARAMETERS IN DATABASE {safe_db}")
-                        result_dict[f"DATABASE_{db}"] = df
-                    except Exception as e:
-                        failed_dbs.append((db, str(e)))
-            if failed_dbs:
-                st.warning("以下のデータベースのパラメータを取得できませんでした:")
-                for db, err in failed_dbs:
-                    st.text(f"{db}: {err}")
-
-            if "WAREHOUSE" in levels:
-                targets = warehouse_list if "ALL" in selected_whs else selected_whs
-                for wh in targets:
-                    try:
-                        safe_wh = escape_identifier(wh)
+                if "SESSION" in levels:
+                    df = run_show_and_fetch("SHOW PARAMETERS IN SESSION")
+                    result_dict["SESSION"] = df
+                
+                failed_dbs = []
+                if "DATABASE" in levels:
+                    targets = database_list if "ALL" in selected_dbs else selected_dbs
+                    for db in targets:
                         try:
-                            cursor.execute(f'ALTER WAREHOUSE {safe_wh} RESUME')
-                        except:
-                            pass
-            
-                        df = run_show_and_fetch(f'SHOW PARAMETERS IN WAREHOUSE {safe_wh}')
-                        if df.empty:
-                            raise ValueError("No parameter data returned")
-            
-                        result_dict[f"WAREHOUSE_{wh}"] = df
-            
-                    except Exception as e:
-                        failed_whs.append((wh, str(e)))
-            
-                if failed_whs:
-                    st.warning("以下のウェアハウスのパラメータを取得できませんでした:")
-                    for wh, err in failed_whs:
-                        st.text(f"{wh}: {err}")
+                            safe_db = escape_identifier(db)
+                            df = run_show_and_fetch(f"SHOW PARAMETERS IN DATABASE {safe_db}")
+                            result_dict[f"DATABASE_{db}"] = df
+                        except Exception as e:
+                            failed_dbs.append((db, str(e)))
+                if failed_dbs:
+                    st.warning("以下のデータベースのパラメータを取得できませんでした:")
+                    for db, err in failed_dbs:
+                        st.text(f"{db}: {err}")
+
+                if "WAREHOUSE" in levels:
+                    targets = warehouse_list if "ALL" in selected_whs else selected_whs
+                    for wh in targets:
+                        try:
+                            safe_wh = escape_identifier(wh)
+                            try:
+                                cursor.execute(f'ALTER WAREHOUSE {safe_wh} RESUME')
+                            except:
+                                pass
+                
+                            df = run_show_and_fetch(f'SHOW PARAMETERS IN WAREHOUSE {safe_wh}')
+                            if df.empty:
+                                raise ValueError("No parameter data returned")
+                
+                            result_dict[f"WAREHOUSE_{wh}"] = df
+                
+                        except Exception as e:
+                            failed_whs.append((wh, str(e)))
+                
+                    if failed_whs:
+                        st.warning("以下のウェアハウスのパラメータを取得できませんでした:")
+                        for wh, err in failed_whs:
+                            st.text(f"{wh}: {err}")
 
 
-            if result_dict:
-                st.success("パラメータ取得完了")
-                excel_file = to_excel_multi_sheet(result_dict)
-                st.download_button(
-                    "Excelとしてダウンロード",
-                    data=excel_file,
-                    file_name="snowflake_parameters.xlsx",
-                    mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                    key="download-excel"
-                )
-                for name, df in result_dict.items():
-                    st.subheader(name)
-                    st.dataframe(df, use_container_width=True)
-            else:
-                st.warning("選択された対象のパラメータを取得できませんでした")
+                if result_dict:
+                    st.success("パラメータ取得完了")
+                    excel_file = to_excel_multi_sheet(result_dict)
+                    st.download_button(
+                        "Excelとしてダウンロード",
+                        data=excel_file,
+                        file_name="snowflake_parameters.xlsx",
+                        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+                        key="download-excel"
+                    )
+                    for name, df in result_dict.items():
+                        st.subheader(name)
+                        st.dataframe(df, use_container_width=True)
+                else:
+                    st.warning("選択された対象のパラメータを取得できませんでした")
 
     with tabs[1]:
         from snowflake.snowpark import Session
@@ -243,37 +243,35 @@ if st.session_state.conn:
 
         # Step 4: 取得実行
         
-if st.button("定義情報を取得"):
-    with st.spinner("⏳ テーブル定義を取得中..."):
-
+        if st.button("定義情報を取得"):
             with st.spinner("⏳ テーブル定義を取得中..."):
-            df_def_all = pd.DataFrame()
-            for tbl in active_tables:
-                try:
-                    db, schema, tbl_name = tbl.split(".")
-                    quoted = f'"{db}"."{schema}"."{tbl_name}"'
-                    df_desc = session.sql(f"DESCRIBE TABLE {quoted}").to_pandas()
-                    df_desc.columns = [str(i) for i in range(df_desc.shape[1])]
-                    df_desc = df_desc.rename(columns={
-                        "0": "column_name",
-                        "1": "data_type",
-                        "3": "nullable",
-                        "5": "primary_key",
-                        "9": "comment"
-                    })[["column_name", "data_type", "nullable", "primary_key", "comment"]]
-                    df_desc["database"] = db
-                    df_desc["schema"] = schema
-                    df_desc["table"] = tbl_name
-                    df_def_all = pd.concat([df_def_all, df_desc], ignore_index=True)
-                except Exception as e:
-                    st.warning(f"{tbl} の定義取得失敗: {e}")
+                df_def_all = pd.DataFrame()
+                for tbl in active_tables:
+                    try:
+                        db, schema, tbl_name = tbl.split(".")
+                        quoted = f'"{db}"."{schema}"."{tbl_name}"'
+                        df_desc = session.sql(f"DESCRIBE TABLE {quoted}").to_pandas()
+                        df_desc.columns = [str(i) for i in range(df_desc.shape[1])]
+                        df_desc = df_desc.rename(columns={
+                            "0": "column_name",
+                            "1": "data_type",
+                            "3": "nullable",
+                            "5": "primary_key",
+                            "9": "comment"
+                        })[["column_name", "data_type", "nullable", "primary_key", "comment"]]
+                        df_desc["database"] = db
+                        df_desc["schema"] = schema
+                        df_desc["table"] = tbl_name
+                        df_def_all = pd.concat([df_def_all, df_desc], ignore_index=True)
+                    except Exception as e:
+                        st.warning(f"{tbl} の定義取得失敗: {e}")
 
-            if not df_def_all.empty:
-                st.dataframe(df_def_all)
+                if not df_def_all.empty:
+                    st.dataframe(df_def_all)
 
-                output = io.BytesIO()
-                df_def_all.astype(str).to_excel(output, index=False)
-                st.download_button("Excelでダウンロード", data=output.getvalue(), file_name="table_definitions.xlsx")
+                    output = io.BytesIO()
+                    df_def_all.astype(str).to_excel(output, index=False)
+                    st.download_button("Excelでダウンロード", data=output.getvalue(), file_name="table_definitions.xlsx")
 
     with tabs[2]:
         st.markdown("### データベース・スキーマ・テーブルの権限一覧")
@@ -330,65 +328,65 @@ if st.button("定義情報を取得"):
         # ---- 実行 & 表示 ----
         if st.button("権限情報を取得"):
             with st.spinner("⏳ 権限情報を取得中..."):
-            grant_results = {}
+                grant_results = {}
 
-            # DBレベル
-            for db in active_dbs:
-                try:
-                    cursor.execute(f"SHOW GRANTS ON DATABASE {db}")
-                    df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
-                    grant_results[f"{db} [DATABASE]"] = df
-                except:
-                    st.warning(f"⚠️ DATABASE {db} のGRANT取得失敗")
+                # DBレベル
+                for db in active_dbs:
+                    try:
+                        cursor.execute(f"SHOW GRANTS ON DATABASE {db}")
+                        df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+                        grant_results[f"{db} [DATABASE]"] = df
+                    except:
+                        st.warning(f"⚠️ DATABASE {db} のGRANT取得失敗")
 
-            # SCHEMAレベル
-            for db, schema in active_schemas:
-                try:
-                    cursor.execute(f"SHOW GRANTS ON SCHEMA {db}.{schema}")
-                    df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
-                    grant_results[f"{db}.{schema} [SCHEMA]"] = df
-                except:
-                    st.warning(f"⚠️ SCHEMA {db}.{schema} のGRANT取得失敗")
+                # SCHEMAレベル
+                for db, schema in active_schemas:
+                    try:
+                        cursor.execute(f"SHOW GRANTS ON SCHEMA {db}.{schema}")
+                        df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+                        grant_results[f"{db}.{schema} [SCHEMA]"] = df
+                    except:
+                        st.warning(f"⚠️ SCHEMA {db}.{schema} のGRANT取得失敗")
 
-            # TABLEレベル
-            for tbl_full in active_tables:
-                try:
-                    cursor.execute(f"SHOW GRANTS ON TABLE {tbl_full}")
-                    df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
-                    grant_results[f"{tbl_full} [TABLE]"] = df
-                except:
-                    st.warning(f"⚠️ TABLE {tbl_full} のGRANT取得失敗")
+                # TABLEレベル
+                for tbl_full in active_tables:
+                    try:
+                        cursor.execute(f"SHOW GRANTS ON TABLE {tbl_full}")
+                        df = pd.DataFrame(cursor.fetchall(), columns=[desc[0] for desc in cursor.description])
+                        grant_results[f"{tbl_full} [TABLE]"] = df
+                    except:
+                        st.warning(f"⚠️ TABLE {tbl_full} のGRANT取得失敗")
 
-            # 表示 & ダウンロード
-            for name, df in grant_results.items():
-                st.subheader(f"{name}")
-                st.dataframe(df)
+                # 表示 & ダウンロード
+                for name, df in grant_results.items():
+                    st.subheader(f"{name}")
+                    st.dataframe(df)
 
-            if grant_results:
-                from io import BytesIO
-                import re
-                used_sheet_names = set()
+                if grant_results:
+                    from io import BytesIO
+                    import re
+                    used_sheet_names = set()
 
-                def safe_sheet_name(name):
-                    name = re.sub(r'[:\\/?*\[\]]', '_', name)
-                    name = name[:31]
-                    base = name
-                    i = 1
-                    while name in used_sheet_names:
-                        name = f"{base[:28]}_{i}"
-                        i += 1
-                    used_sheet_names.add(name)
-                    return name
+                    def safe_sheet_name(name):
+                        name = re.sub(r'[:\\/?*\[\]]', '_', name)
+                        name = name[:31]
+                        base = name
+                        i = 1
+                        while name in used_sheet_names:
+                            name = f"{base[:28]}_{i}"
+                            i += 1
+                        used_sheet_names.add(name)
+                        return name
 
-                excel_io = BytesIO()
-                with pd.ExcelWriter(excel_io, engine="openpyxl") as writer:
-                    for name, df in grant_results.items():
-                        sheet_name = safe_sheet_name(name)
-                        try:
-                            df.astype(str).to_excel(writer, index=False, sheet_name=sheet_name)
-                        except Exception as e:
-                            st.warning(f"❌ Excel出力エラー（{sheet_name}）: {e}")
-                st.download_button("Excelでダウンロード", data=excel_io.getvalue(), file_name="object_grants_by_level.xlsx")
+                    excel_io = BytesIO()
+                    with pd.ExcelWriter(excel_io, engine="openpyxl") as writer:
+                        for name, df in grant_results.items():
+                            sheet_name = safe_sheet_name(name)
+                            try:
+                                df.astype(str).to_excel(writer, index=False, sheet_name=sheet_name)
+                            except Exception as e:
+                                st.warning(f"❌ Excel出力エラー（{sheet_name}）: {e}")
+                    st.download_button("Excelでダウンロード", data=excel_io.getvalue(), file_name="object_grants_by_level.xlsx")
 
 else:
     st.warning("まず左のサイドバーでSnowflakeに接続してください。")
