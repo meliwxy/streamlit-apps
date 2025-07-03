@@ -242,7 +242,10 @@ if st.session_state.conn:
         active_tables = [t for t in table_display if t != "ALL"] if "ALL" in selected_tables else selected_tables
 
         # Step 4: 取得実行
-        if st.button("定義情報を取得"):
+        
+if st.button("定義情報を取得"):
+    with st.spinner("⏳ テーブル定義を取得中..."):
+
             with st.spinner("⏳ テーブル定義を取得中..."):
             df_def_all = pd.DataFrame()
             for tbl in active_tables:
