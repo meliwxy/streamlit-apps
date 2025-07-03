@@ -30,14 +30,20 @@ st.title("Snowflake 情報統合ツール")
 
 with st.expander("ツールの目的と概要", expanded=True):
     st.markdown("""
-    本ツールは、Snowflake環境における各種設定パラメータを手軽に一括確認・出力するためのアプリです。
+    本ツールは、**Snowflakeアカウント内の構成情報・パラメータ・ロール権限をGUIで統合的に取得・出力**できる管理支援ツールです。
 
-    `SHOW PARAMETERS` コマンドを個別に実行する必要なく、選択した対象をまとめて取得・確認・Excel出力できます。
+    ### 主な機能
 
-    **活用例：**
-    - 開発者・管理者による設定確認
-    - クライアント説明用の資料作成
-    - トラブル対応時の環境設定把握
+    - **パラメータ出力**  
+      アカウント・セッション・データベース（全体または選択）・ウェアハウス（全体または選択）のパラメータ設定を確認・Excel出力可能。
+
+    - **テーブル定義出力**  
+      アカウント内のすべてのデータベース構造を横断的に確認。各テーブルの定義情報（カラム名、データ型、NULL可否、主キー、コメント）およびサンプルデータを取得し、Excel出力可能。
+
+    - **ロール権限一覧**  
+      各データベース・スキーマ・テーブルに対するロール権限の付与状況を階層別に可視化。対象オブジェクトを選択して、詳細を確認・Excel出力可能。
+
+    ※ すべての出力内容は、画面プレビューまたはExcel形式でダウンロード可能です。
     """)
 
 if "conn" not in st.session_state:
@@ -420,7 +426,7 @@ if st.session_state.conn:
                     )
 
     with tabs[2]:
-        st.markdown("### データベース・スキーマ・テーブルの権限一覧（階層別表示）")
+        st.markdown("### データベース・スキーマ・テーブルの権限一覧")
 
         conn = st.session_state.get("conn")
         if not conn:
@@ -433,7 +439,7 @@ if st.session_state.conn:
         cursor.execute("SHOW DATABASES")
         all_dbs = [row[1] for row in cursor.fetchall()]
         dbs_display = ["ALL"] + all_dbs
-        selected_dbs = st.multiselect("📁 データベースを選択（DB権限表示）", dbs_display, default=["ALL"])
+        selected_dbs = st.multiselect("データベースを選択", dbs_display, default=["ALL"])
         active_dbs = all_dbs if "ALL" in selected_dbs or not selected_dbs else selected_dbs
 
         # ---- スキーマ選択 ----
@@ -451,7 +457,7 @@ if st.session_state.conn:
                 st.warning(f"{db} のスキーマ取得に失敗しました。")
 
         schema_display = ["ALL"] + schema_display
-        selected_schemas = st.multiselect("📂 スキーマを選択（スキーマ権限表示）", schema_display)
+        selected_schemas = st.multiselect("スキーマを選択", schema_display)
         active_schemas = list(schema_map.values()) if "ALL" in selected_schemas else [
             schema_map[s] for s in selected_schemas if s in schema_map
         ]
@@ -468,7 +474,7 @@ if st.session_state.conn:
                 st.warning(f"{db}.{schema} のテーブル取得に失敗しました。")
 
         table_display = ["ALL"] + table_display
-        selected_tables = st.multiselect("📄 テーブルを選択（テーブル権限表示）", table_display)
+        selected_tables = st.multiselect("テーブルを選択", table_display)
         active_tables = [t for t in table_display if t != "ALL"] if "ALL" in selected_tables else selected_tables
 
         # ---- 実行 & 表示 ----
@@ -504,7 +510,7 @@ if st.session_state.conn:
 
             # 表示 & ダウンロード
             for name, df in grant_results.items():
-                st.subheader(f"🔐 {name}")
+                st.subheader(f"{name}")
                 st.dataframe(df)
 
             if grant_results:
