@@ -8,8 +8,8 @@ from io import BytesIO
 st.set_page_config(page_title="Snowflake Information Tool", layout="wide", initial_sidebar_state="expanded")
 
 # --- Sidebar: Snowflake credentials ---
-st.sidebar.header("Snowflake 接続設定 ＊1")
-account = st.sidebar.text_input("Account Identifier ＊2", value="", placeholder="例：abc-xy12345")
+st.sidebar.header("Snowflake 接続設定¹")
+account = st.sidebar.text_input("Account Identifier²", value="", placeholder="例：abc-xy12345")
 user = st.sidebar.text_input("User Name", value="")
 password = st.sidebar.text_input("Password", type="password")
 st.sidebar.markdown(
