@@ -15,7 +15,7 @@ user = st.sidebar.text_input("User Name", value="")
 password = st.sidebar.text_input("Password", type="password")
 st.sidebar.markdown(
     "**＊1** 個人アカウントをご利用の場合、Duo認証による承認が必要です。ご確認ください。  \n"
-    "**＊2** [Account Identifierの確認方法は[こちら](https://docs.snowflake.com/ja/user-guide/admin-account-identifier)"
+    "**＊2** Account Identifierの確認方法は [こちら](https://docs.snowflake.com/ja/user-guide/admin-account-identifier)"
 )
 
 if "conn" not in st.session_state:
