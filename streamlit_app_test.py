@@ -91,7 +91,7 @@ if st.session_state.conn:
         try:
             session.sql(f"USE ROLE {selected_role}").collect()
             st.success(f"ロールを「{selected_role}」に切り替えました")
-            st.experimental_rerun()
+            st.rerun()
         except Exception as e:
             st.error(f"ロール切り替えに失敗しました: {e}")
     
