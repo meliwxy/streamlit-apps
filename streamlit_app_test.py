@@ -8,11 +8,14 @@ from io import BytesIO
 st.set_page_config(page_title="Snowflake Information Tool", layout="wide", initial_sidebar_state="expanded")
 
 # --- Sidebar: Snowflake credentials ---
-st.sidebar.header("Snowflake 接続設定")
-account = st.sidebar.text_input("Account Identifier", value="", placeholder="例：abc-xy12345")
+st.sidebar.header("Snowflake 接続設定 ＊1")
+account = st.sidebar.text_input("Account Identifier ＊2", value="", placeholder="例：abc-xy12345")
 user = st.sidebar.text_input("User Name", value="")
 password = st.sidebar.text_input("Password", type="password")
-st.sidebar.markdown("\uff0a個人アカウントをご利用の場合、Duo認証による承認が必要です。ご確認ください。")
+st.sidebar.markdown(
+    "**＊1** 個人アカウントをご利用の場合、Duo認証による承認が必要です。ご確認ください。  \n"
+    "**＊2** [Account Identifierの確認方法はこちら](https://docs.snowflake.com/ja/user-guide/admin-account-identifier)"
+)
 
 if "conn" not in st.session_state:
     st.session_state.conn = None
