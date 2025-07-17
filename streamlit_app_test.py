@@ -53,6 +53,8 @@ if "conn" not in st.session_state:
     st.session_state.conn = None
 
 if st.session_state.conn:
+    session = st.session_state.snowpark_session
+    
     roles_df = session.sql("SHOW ROLES").to_pandas()
     role_names = sorted(roles_df["name"].tolist())
 
