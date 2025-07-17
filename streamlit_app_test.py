@@ -53,8 +53,22 @@ if "conn" not in st.session_state:
     st.session_state.conn = None
 
 if st.session_state.conn:
+    if "snowpark_session" not in st.session_state:
+        try:
+            connection_parameters = {
+                "account": account,
+                "user": user,
+                "password": password,
+                "role": "ACCOUNTADMIN",  # 或默认值
+                "warehouse": "YOUR_WAREHOUSE"
+            }
+            st.session_state.snowpark_session = Session.builder.configs(connection_parameters).create()
+        except Exception as e:
+            st.error(f"Snowpark セッション作成失敗: {e}")
+            st.stop()
+
     session = st.session_state.snowpark_session
-    
+
     roles_df = session.sql("SHOW ROLES").to_pandas()
     role_names = sorted(roles_df["name"].tolist())
 
