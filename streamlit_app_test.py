@@ -60,9 +60,10 @@ if st.session_state.conn:
                 "account": account,
                 "user": user,
                 "password": password,
-                "role": "ACCOUNTADMIN",  # 或默认值
+                "role": "ACCOUNTADMIN",  # または default role
                 "warehouse": "YOUR_WAREHOUSE"
             }
+            from snowflake.snowpark import Session  # ← 忘れず import
             st.session_state.snowpark_session = Session.builder.configs(connection_parameters).create()
         except Exception as e:
             st.error(f"Snowpark セッション作成失敗: {e}")
@@ -70,33 +71,42 @@ if st.session_state.conn:
 
     session = st.session_state.snowpark_session
 
+    # case-insensitive カラム取得関数
     def get_column_case_insensitive(df, target_col):
         for col in df.columns:
             if col.strip('"').lower() == target_col.lower():
                 return col
         return None
 
-    roles_df = session.sql("SHOW ROLES").to_pandas()
-
-    name_col = get_column_case_insensitive(roles_df, "name")
-    if name_col is None:
-        st.error(f"`name`列が見つかりません。カラム一覧: {roles_df.columns.tolist()}")
+    # --- ロール一覧取得
+    try:
+        roles_df = session.sql("SHOW ROLES").to_pandas()
+        name_col = get_column_case_insensitive(roles_df, "name")
+        if name_col is None:
+            st.error(f"`name`列が見つかりません。カラム一覧: {roles_df.columns.tolist()}")
+            st.stop()
+        role_names = sorted(roles_df[name_col].dropna().unique().tolist())
+    except Exception as e:
+        st.error(f"ロール取得エラー: {e}")
         st.stop()
 
-    role_names = sorted(roles_df[name_col].tolist())
-
+    # --- 選択UIと切替処理
     selected_role = st.sidebar.selectbox("使用するロールを選択", role_names)
 
     if st.sidebar.button("このロールに切り替え"):
         try:
             session.sql(f"USE ROLE {selected_role}").collect()
             st.success(f"ロールを「{selected_role}」に切り替えました")
-            st.rerun()
+            st.experimental_rerun()  # ✅ ← 必須：streamlit.rerun()は未対応の場合がある
         except Exception as e:
             st.error(f"ロール切り替えに失敗しました: {e}")
-    
-    current_role = session.sql("SELECT CURRENT_ROLE()").to_pandas().iloc[0, 0]
-    st.sidebar.markdown(f"現在のロール：`{current_role}`")
+
+    # --- 現在のロールを表示（1回のみ）
+    try:
+        current_role = session.sql("SELECT CURRENT_ROLE()").to_pandas().iloc[0, 0]
+        st.sidebar.markdown(f"現在のロール：<span style='color:green'><b>{current_role}</b></span>", unsafe_allow_html=True)
+    except Exception as e:
+        st.sidebar.warning("現在のロールの取得に失敗しました")
 
     tabs = st.tabs(["パラメータ設定", "テーブル定義書", "ロール権限一覧"])
 
