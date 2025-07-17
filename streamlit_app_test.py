@@ -71,7 +71,8 @@ if st.session_state.conn:
     session = st.session_state.snowpark_session
 
     roles_df = session.sql("SHOW ROLES").to_pandas()
-    role_names = sorted(roles_df["name"].tolist())
+    role_col = "name" if "name" in roles_df.columns else "NAME"
+    role_names = sorted(roles_df[role_col].tolist())
 
     selected_role = st.sidebar.selectbox("使用するロールを選択", role_names)
 
