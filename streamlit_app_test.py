@@ -53,6 +53,22 @@ if "conn" not in st.session_state:
     st.session_state.conn = None
 
 if st.session_state.conn:
+    roles_df = session.sql("SHOW ROLES").to_pandas()
+    role_names = sorted(roles_df["name"].tolist())
+
+    selected_role = st.sidebar.selectbox("使用するロールを選択", role_names)
+
+    if st.sidebar.button("このロールに切り替え"):
+        try:
+            session.sql(f"USE ROLE {selected_role}").collect()
+            st.success(f"ロールを「{selected_role}」に切り替えました")
+            st.experimental_rerun()
+        except Exception as e:
+            st.error(f"ロール切り替えに失敗しました: {e}")
+    
+    current_role = session.sql("SELECT CURRENT_ROLE()").to_pandas().iloc[0, 0]
+    st.sidebar.markdown(f"現在のロール：`{current_role}`")
+
     tabs = st.tabs(["パラメータ設定", "テーブル定義書", "ロール権限一覧"])
 
     with tabs[0]:
