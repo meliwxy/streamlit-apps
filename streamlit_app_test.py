@@ -70,9 +70,20 @@ if st.session_state.conn:
 
     session = st.session_state.snowpark_session
 
+    def get_column_case_insensitive(df, target_col):
+        for col in df.columns:
+            if col.strip('"').lower() == target_col.lower():
+                return col
+        return None
+
     roles_df = session.sql("SHOW ROLES").to_pandas()
-    role_col = "name" if "name" in roles_df.columns else "NAME"
-    role_names = sorted(roles_df[role_col].tolist())
+
+    name_col = get_column_case_insensitive(roles_df, "name")
+    if name_col is None:
+        st.error(f"`name`列が見つかりません。カラム一覧: {roles_df.columns.tolist()}")
+        st.stop()
+
+    role_names = sorted(roles_df[name_col].tolist())
 
     selected_role = st.sidebar.selectbox("使用するロールを選択", role_names)
 
