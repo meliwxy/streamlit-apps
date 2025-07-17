@@ -1,4 +1,5 @@
 import streamlit as st
+from snowflake.snowpark import Session
 import pandas as pd
 import re
 import snowflake.connector
@@ -8,11 +9,14 @@ from io import BytesIO
 st.set_page_config(page_title="Snowflake Information Tool", layout="wide", initial_sidebar_state="expanded")
 
 # --- Sidebar: Snowflake credentials ---
-st.sidebar.header("Snowflake 接続設定")
-account = st.sidebar.text_input("Account Identifier", value="", placeholder="例：abc-xy12345")
+st.sidebar.header("Snowflake 接続設定¹")
+account = st.sidebar.text_input("Account Identifier²", value="", placeholder="例：abc-xy12345")
 user = st.sidebar.text_input("User Name", value="")
 password = st.sidebar.text_input("Password", type="password")
-st.sidebar.markdown("\uff0a個人アカウントをご利用の場合、Duo認証による承認が必要です。ご確認ください。")
+st.sidebar.markdown(
+    "**＊1** 個人アカウントをご利用の場合、Duo認証による承認が必要です。ご確認ください。  \n"
+    "**＊2** Account Identifierの確認方法は [こちら](https://docs.snowflake.com/ja/user-guide/admin-account-identifier)"
+)
 
 if "conn" not in st.session_state:
     st.session_state.conn = None
@@ -50,6 +54,59 @@ if "conn" not in st.session_state:
     st.session_state.conn = None
 
 if st.session_state.conn:
+    if "snowpark_session" not in st.session_state:
+        try:
+            connection_parameters = {
+                "account": account,
+                "user": user,
+                "password": password,
+                "role": "ACCOUNTADMIN",  # または default role
+                "warehouse": "YOUR_WAREHOUSE"
+            }
+            from snowflake.snowpark import Session  # ← 忘れず import
+            st.session_state.snowpark_session = Session.builder.configs(connection_parameters).create()
+        except Exception as e:
+            st.error(f"Snowpark セッション作成失敗: {e}")
+            st.stop()
+
+    session = st.session_state.snowpark_session
+
+    # case-insensitive カラム取得関数
+    def get_column_case_insensitive(df, target_col):
+        for col in df.columns:
+            if col.strip('"').lower() == target_col.lower():
+                return col
+        return None
+
+    # --- ロール一覧取得
+    try:
+        roles_df = session.sql("SHOW ROLES").to_pandas()
+        name_col = get_column_case_insensitive(roles_df, "name")
+        if name_col is None:
+            st.error(f"`name`列が見つかりません。カラム一覧: {roles_df.columns.tolist()}")
+            st.stop()
+        role_names = sorted(roles_df[name_col].dropna().unique().tolist())
+    except Exception as e:
+        st.error(f"ロール取得エラー: {e}")
+        st.stop()
+
+    # --- 選択UIと切替処理
+    selected_role = st.sidebar.selectbox("使用するロールを選択", role_names)
+
+    if st.sidebar.button("このロールに切り替え"):
+        try:
+            session.sql(f"USE ROLE {selected_role}").collect()
+            st.success(f"ロールを「{selected_role}」に切り替えました")
+            st.rerun() 
+        except Exception as e:
+            st.error(f"ロール切り替えに失敗しました: {e}")
+
+    try:
+        current_role = session.sql("SELECT CURRENT_ROLE()").to_pandas().iloc[0, 0]
+        st.sidebar.markdown(f"現在のロール：<span style='color:green'><b>{current_role}</b></span>", unsafe_allow_html=True)
+    except Exception as e:
+        st.sidebar.warning("現在のロールの取得に失敗しました")
+
     tabs = st.tabs(["パラメータ設定", "テーブル定義書", "ロール権限一覧"])
 
     with tabs[0]:
