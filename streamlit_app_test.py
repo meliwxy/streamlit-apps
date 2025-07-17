@@ -97,11 +97,10 @@ if st.session_state.conn:
         try:
             session.sql(f"USE ROLE {selected_role}").collect()
             st.success(f"ロールを「{selected_role}」に切り替えました")
-            st.experimental_rerun()  # ✅ ← 必須：streamlit.rerun()は未対応の場合がある
+            st.rerun() 
         except Exception as e:
             st.error(f"ロール切り替えに失敗しました: {e}")
 
-    # --- 現在のロールを表示（1回のみ）
     try:
         current_role = session.sql("SELECT CURRENT_ROLE()").to_pandas().iloc[0, 0]
         st.sidebar.markdown(f"現在のロール：<span style='color:green'><b>{current_role}</b></span>", unsafe_allow_html=True)
